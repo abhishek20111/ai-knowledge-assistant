@@ -131,7 +131,7 @@ def build_prompt_node(state: RAGState) -> RAGState:
             "filename": filename,
             "page": page,
             "chunk_text": text[:300] + ("..." if len(text) > 300 else ""),
-            "score": round(float(chunk.get("score", 0.0)), 4),
+            "score": round(chunk.get("score", 0.0), 4),
         })
 
     context_str = "\n\n---\n\n".join(context_parts)
