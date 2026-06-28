@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Enterprise AI Knowledge Assistant</title>
+  <meta name="description" content="Enterprise AI Knowledge Assistant powered by Advanced RAG with Hybrid Search, LangGraph Streaming, and Citation Generation." />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🧠</text></svg>" />
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loading-overlay">
+  <div class="loader-ring"></div>
+  <p style="color:var(--text-muted);font-size:0.82rem;">Initializing Knowledge Assistant...</p>
+</div>
+
+<!-- App Shell -->
+<div id="app">
+
+  <!-- ─── Sidebar ─────────────────────────────────────────────── -->
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <div class="brand-icon">🧠</div>
+        <div class="brand-text">
+          <h1>KnowledgeAI</h1>
+          <span>Enterprise RAG Platform</span>
+        </div>
+      </div>
+      <button class="btn-new-chat" id="btn-new-chat" onclick="startNewChat()">
+        <span>✏️</span> New Conversation
+      </button>
+    </div>
+
+    <!-- Nav Tabs -->
+    <div class="sidebar-tabs">
+      <button class="sidebar-tab active" id="tab-chats" onclick="switchSidebarTab('chats')">
+        💬 Chats
+      </button>
+      <button class="sidebar-tab" id="tab-docs" onclick="switchSidebarTab('docs')">
+        📄 Docs
+      </button>
+      <button class="sidebar-tab" id="tab-upload" onclick="switchSidebarTab('upload')">
+        ⬆️ Upload
+      </button>
+    </div>
+
+    <!-- Chats Panel -->
+    <div class="sidebar-panel active" id="panel-chats">
+      <div id="conv-list">
+        <div class="empty-state">
+          <div class="empty-icon">💬</div>
+          <p>No conversations yet.<br>Start chatting!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Documents Panel -->
+    <div class="sidebar-panel" id="panel-docs">
+      <div id="doc-list">
+        <div class="empty-state">
+          <div class="empty-icon">📂</div>
+          <p>No documents uploaded.<br>Upload files to get started!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Upload Panel (in sidebar) -->
+    <div class="sidebar-panel" id="panel-upload">
+      <div style="padding:8px 4px;">
+        <div class="upload-zone" id="sidebar-upload-zone" onclick="document.getElementById('sidebar-file-input').click()">
+          <div class="upload-icon">📎</div>
+          <h3 style="font-size:0.88rem;">Drop files here</h3>
+          <p>PDF, DOCX, XLSX, Images</p>
+          <div class="upload-formats" style="margin-top:10px;">
+            <span class="fmt-badge fmt-pdf">PDF</span>
+            <span class="fmt-badge fmt-docx">DOCX</span>
+            <span class="fmt-badge fmt-xlsx">XLSX</span>
+            <span class="fmt-badge fmt-image">IMG</span>
+          </div>
+        </div>
+        <input type="file" id="sidebar-file-input" multiple accept=".pdf,.docx,.doc,.xlsx,.xls,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.webp" style="display:none" />
+        <div id="sidebar-upload-queue" class="upload-queue" style="margin-top:12px;"></div>
+      </div>
+    </div>
+
+    <!-- Footer Stats -->
+    <div class="sidebar-footer">
+      <div class="stats-row">
+        <div class="stat-pill">
+          <div class="stat-value" id="stat-docs">0</div>
+          <div class="stat-label">Documents</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-value" id="stat-chunks">0</div>
+          <div class="stat-label">Chunks</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-value" id="stat-convs">0</div>
+          <div class="stat-label">Chats</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ─── Main Area ───────────────────────────────────────────── -->
+  <main id="main">
+    <!-- Top Bar -->
+    <div id="topbar">
+      <div class="topbar-title">
+        <h2 id="topbar-conv-title">Enterprise Knowledge Assistant</h2>
+        <p id="topbar-conv-subtitle">Upload documents and start asking questions</p>
+      </div>
+      <div class="doc-filter-wrap" id="doc-filter-chips"></div>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost" id="btn-clear-chat" onclick="clearCurrentChat()" style="display:none">
+          🗑️ Clear
+        </button>
+        <button class="btn btn-ghost" onclick="switchSidebarTab('upload')">
+          ⬆️ Upload
+        </button>
+      </div>
+    </div>
+
+    <!-- Chat Area -->
+    <div id="chat-area">
+      <!-- Welcome Screen -->
+      <div id="welcome-screen">
+        <div class="welcome-logo">🧠</div>
+        <h2 class="welcome-title">Enterprise Knowledge Assistant</h2>
+        <p class="welcome-subtitle">
+          Upload your documents and ask anything. Powered by advanced RAG with hybrid search and AI citations.
+        </p>
+        <div class="example-cards">
+          <div class="example-card" onclick="sendExampleQuery(this.querySelector('.card-text').textContent)">
+            <div class="card-icon">📋</div>
+            <div class="card-text">What is the leave policy according to the HR documents?</div>
+          </div>
+          <div class="example-card" onclick="sendExampleQuery(this.querySelector('.card-text').textContent)">
+            <div class="card-icon">💰</div>
+            <div class="card-text">Who approved this invoice and what is the total amount?</div>
+          </div>
+          <div class="example-card" onclick="sendExampleQuery(this.querySelector('.card-text').textContent)">
+            <div class="card-icon">📝</div>
+            <div class="card-text">Summarize the key clauses in the contract</div>
+          </div>
+          <div class="example-card" onclick="sendExampleQuery(this.querySelector('.card-text').textContent)">
+            <div class="card-icon">🔍</div>
+            <div class="card-text">What are the quarterly revenue figures from the Excel report?</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Messages Container -->
+      <div id="messages" style="display:none;"></div>
+
+      <!-- Input Area -->
+      <div id="input-area">
+        <div class="input-container">
+          <textarea
+            id="chat-input"
+            rows="1"
+            placeholder="Ask anything about your documents..."
+            onkeydown="handleInputKeydown(event)"
+            oninput="autoResize(this)"
+          ></textarea>
+          <div class="input-actions">
+            <button class="btn-send" id="btn-send" onclick="sendMessage()">
+              ➤
+            </button>
+          </div>
+        </div>
+        <div class="input-hint">
+          Press <kbd style="background:var(--bg-elevated);padding:1px 5px;border-radius:3px;font-size:0.65rem;border:1px solid var(--border-subtle)">Enter</kbd> to send ·
+          <kbd style="background:var(--bg-elevated);padding:1px 5px;border-radius:3px;font-size:0.65rem;border:1px solid var(--border-subtle)">Shift+Enter</kbd> for new line
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<!-- Scripts -->
+<script src="/js/api.js"></script>
+<script src="/js/upload.js"></script>
+<script src="/js/documents.js"></script>
+<script src="/js/chat.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

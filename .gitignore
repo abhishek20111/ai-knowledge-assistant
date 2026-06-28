@@ -1,0 +1,54 @@
+# Virtual environment — NEVER commit this (huge, machine-specific)
+venv/
+.venv/
+env/
+
+# Python cache — auto-generated, not needed
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyc
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Data directories — user-specific, can be large
+uploads/           # uploaded document files
+chroma_db/         # vector store database
+sessions/          # session JSON files
+
+# SQLite database — auto-created at runtime
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Environment config
+.env
+.env.local
+.env.production
+
+# IDE & editor
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# BM25 index — rebuilt automatically from ChromaDB
+bm25_index.pkl
+
+# EasyOCR model cache — downloaded on first use
+.EasyOCR/
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
