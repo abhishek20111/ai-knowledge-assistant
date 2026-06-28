@@ -1,7 +1,8 @@
 # 🧠 Enterprise AI Knowledge Assistant
 
 ```
-![alt text](image.png)
+<img width="1917" height="872" alt="image" src="https://github.com/user-attachments/assets/9d97b6c7-16f1-4640-8574-0cd457f82751" />
+
 ```
 
 > **Talk to your company documents using AI** — Upload PDFs, Word files, Excel sheets, and images. Ask anything in plain English and get accurate answers with source citations, powered by a fully local AI stack.
