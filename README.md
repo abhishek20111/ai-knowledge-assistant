@@ -43,6 +43,36 @@
 
 ---
 
+## ✅ v1.0.0 — What’s New
+
+This release adds a complete end-to-end user experience for secure, local, and production-ready document Q&A.
+
+### New capabilities
+
+- 🔐 JWT authentication with register, login, and current-user endpoints
+- 🧑‍🤝‍🧑 Per-user data isolation so each account only sees its own documents and conversations
+- 🎨 Login and registration UI with animated switching, user badge, and logout flow
+- 📊 Local RAG evaluation endpoint for faithfulness, relevance, and context recall scoring
+- 🐳 Docker support with a multi-stage container build and Docker Compose setup
+- 🧪 Verified behavior for auth, isolation, duplicate-user blocking, and unauthenticated access
+
+### Quick start
+
+1. Open http://localhost:8000/
+2. Register a new account
+3. Upload your documents
+4. Start chatting with the AI assistant
+
+### Example evaluation flow
+
+Use the evaluation endpoint to score an answer locally with the built-in judge model:
+
+- `POST /api/evaluate`
+- Scores: Faithfulness, Relevance, Context Recall
+- Uses `qwen2.5:7b` locally with no OpenAI dependency
+
+---
+
 ## ✨ Features
 
 ### 🔍 Advanced Retrieval (What Makes It Enterprise-Grade)

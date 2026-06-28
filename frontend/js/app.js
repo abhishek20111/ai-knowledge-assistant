@@ -19,7 +19,9 @@ async function initApp() {
   // Gate on authentication
   const loggedIn = auth.isLoggedIn() && await auth.verifyToken();
   if (!loggedIn) {
-    auth.logout();   // clear any stale token
+    // Clear stale token WITHOUT reloading the page
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
     showAuthScreen();
     hideLoader();
     return;
