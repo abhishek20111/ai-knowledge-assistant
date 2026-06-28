@@ -13,6 +13,7 @@ async def hybrid_search(
     query: str,
     k: int = None,
     doc_filter: Optional[List[str]] = None,
+    user_id: Optional[str] = None,
 ) -> List[Dict]:
     """
     Hybrid search: dense + sparse → RRF fusion.
@@ -23,10 +24,12 @@ async def hybrid_search(
 
     # 1. Dense search (ChromaDB)
     query_embedding = await embed_query(query)
-    dense_hits = await vector_store.similarity_search(query_embedding, k=k, doc_filter=doc_filter)
+    dense_hits = await vector_store.similarity_search(
+        query_embedding, k=k, doc_filter=doc_filter, user_id=user_id
+    )
 
     # 2. Sparse search (BM25)
-    sparse_hits = bm25_store.search(query, k=k, doc_filter=doc_filter)
+    sparse_hits = bm25_store.search(query, k=k, doc_filter=doc_filter, user_id=user_id)
 
     # 3. RRF fusion
     fused = _reciprocal_rank_fusion(dense_hits, sparse_hits, k=60)

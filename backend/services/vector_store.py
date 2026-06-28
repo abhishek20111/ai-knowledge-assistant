@@ -85,14 +85,32 @@ async def similarity_search(
     query_embedding: List[float],
     k: int = 20,
     doc_filter: Optional[List[str]] = None,
+    user_id: Optional[str] = None,
 ) -> List[Dict]:
-    """Dense vector similarity search on child chunks."""
+    """Dense vector similarity search on child chunks, filtered by user."""
     child_col = get_child_collection()
-    where = {"doc_id": {"$in": doc_filter}} if doc_filter else None
+
+    # Build ChromaDB `where` filter — user_id always applied if provided
+    conditions = []
+    if user_id:
+        conditions.append({"user_id": {"$eq": user_id}})
+    if doc_filter:
+        conditions.append({"doc_id": {"$in": doc_filter}})
+
+    if len(conditions) > 1:
+        where = {"$and": conditions}
+    elif len(conditions) == 1:
+        where = conditions[0]
+    else:
+        where = None
+
+    count = child_col.count()
+    if count == 0:
+        return []
 
     results = child_col.query(
         query_embeddings=[query_embedding],
-        n_results=min(k, child_col.count() or 1),
+        n_results=min(k, count),
         where=where,
         include=["documents", "metadatas", "distances"],
     )
@@ -104,7 +122,7 @@ async def similarity_search(
                 "chunk_id": chunk_id,
                 "text": results["documents"][0][i],
                 "metadata": results["metadatas"][0][i],
-                "score": 1.0 - results["distances"][0][i],  # cosine → similarity
+                "score": 1.0 - results["distances"][0][i],
                 "search_type": "dense",
             })
     return hits

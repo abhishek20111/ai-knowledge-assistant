@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    container_name: enterprise-rag
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./uploads:/app/uploads          # persist uploaded files
+      - ./chroma_db:/app/chroma_db      # persist vector store
+      - ./sessions:/app/sessions        # persist session state
+      - ./rag.db:/app/backend/rag.db    # persist SQLite DB
+    environment:
+      # Ollama runs on your HOST machine (GPU access)
+      # Docker containers use host.docker.internal to reach host services
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - LLM_MODEL=${LLM_MODEL:-qwen2.5:7b}
+      - EMBED_MODEL=${EMBED_MODEL:-nomic-embed-text}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-in-production}
+      - JWT_EXPIRE_DAYS=${JWT_EXPIRE_DAYS:-7}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Linux compatibility
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

@@ -50,8 +50,9 @@ class RAGState(TypedDict):
     query: str
     conversation_history: List[Dict]
     doc_filter: Optional[List[str]]
+    user_id: Optional[str]          # ← for per-user chunk filtering
     retrieved_chunks: List[Dict]
-    context_chunks: List[Dict]       # after parent expansion
+    context_chunks: List[Dict]
     reranked_chunks: List[Dict]
     citations: List[Dict]
     prompt: str
@@ -61,11 +62,12 @@ class RAGState(TypedDict):
 # ─── LangGraph Nodes ──────────────────────────────────────────────────────────
 
 async def retrieve_node(state: RAGState) -> RAGState:
-    """Multi-query hybrid retrieval."""
+    """Multi-query hybrid retrieval — filtered by user_id."""
     hits = await multi_query_search(
         query=state["query"],
         k=settings.RETRIEVAL_K,
         doc_filter=state.get("doc_filter"),
+        user_id=state.get("user_id"),
     )
     state["retrieved_chunks"] = hits
     return state
@@ -182,6 +184,7 @@ async def run_rag_stream(
     query: str,
     conversation_history: List[Dict],
     doc_filter: Optional[List[str]] = None,
+    user_id: Optional[str] = None,
 ) -> AsyncIterator[Dict]:
     """
     Run the full RAG pipeline and yield streaming events:
@@ -199,6 +202,7 @@ async def run_rag_stream(
             "query": query,
             "conversation_history": conversation_history,
             "doc_filter": doc_filter,
+            "user_id": user_id,
             "retrieved_chunks": [],
             "context_chunks": [],
             "reranked_chunks": [],

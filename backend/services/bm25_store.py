@@ -52,8 +52,8 @@ def remove_from_index(doc_id: str) -> None:
         _save_index()
 
 
-def search(query: str, k: int = 20, doc_filter: Optional[List[str]] = None) -> List[Dict]:
-    """BM25 keyword search."""
+def search(query: str, k: int = 20, doc_filter: Optional[List[str]] = None, user_id: Optional[str] = None) -> List[Dict]:
+    """BM25 keyword search, filtered by user_id and optionally by doc_filter."""
     global _bm25, _corpus
     if _bm25 is None or not _corpus:
         return []
@@ -66,6 +66,8 @@ def search(query: str, k: int = 20, doc_filter: Optional[List[str]] = None) -> L
         if score > 0:
             chunk = _corpus[idx]
             meta = chunk.get("metadata", {})
+            if user_id and meta.get("user_id") != user_id:
+                continue
             if doc_filter and meta.get("doc_id") not in doc_filter:
                 continue
             hits.append({
@@ -78,6 +80,7 @@ def search(query: str, k: int = 20, doc_filter: Optional[List[str]] = None) -> L
 
     hits.sort(key=lambda x: x["score"], reverse=True)
     return hits[:k]
+
 
 
 def _save_index():

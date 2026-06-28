@@ -5,22 +5,40 @@
 const SESSION_KEY = 'rag_session_id';
 let sessionId = null;
 
-// ─── Initialization ───────────────────────────────────────────
+// ─── Initialization ────────────────────────────────────────────────────────────
 
 async function initApp() {
-  // Get or create session ID
-  sessionId = localStorage.getItem(SESSION_KEY);
-  if (!sessionId) {
-    sessionId = 'sess_' + Math.random().toString(36).slice(2) + Date.now();
-    localStorage.setItem(SESSION_KEY, sessionId);
-  }
-
-  // Check backend health
+  // Check backend health first
   const healthy = await api.checkHealth();
   if (!healthy) {
     showBackendError();
     hideLoader();
     return;
+  }
+
+  // Gate on authentication
+  const loggedIn = auth.isLoggedIn() && await auth.verifyToken();
+  if (!loggedIn) {
+    auth.logout();   // clear any stale token
+    showAuthScreen();
+    hideLoader();
+    return;
+  }
+
+  // Show user info in header
+  const user = auth.getUser();
+  const userBadge = document.getElementById('user-badge');
+  const userBadgeName = document.getElementById('user-badge-name');
+  if (userBadge && user) {
+    userBadgeName.textContent = user.username;
+    userBadge.style.display = 'flex';
+  }
+
+  // Get or create session ID
+  sessionId = localStorage.getItem(SESSION_KEY);
+  if (!sessionId) {
+    sessionId = 'sess_' + Math.random().toString(36).slice(2) + Date.now();
+    localStorage.setItem(SESSION_KEY, sessionId);
   }
 
   // Load initial data in parallel
@@ -35,9 +53,7 @@ async function initApp() {
     const session = await api.getSession(sessionId);
     if (session?.active_conversation_id) {
       const conv = allConversations.find(c => c.id === session.active_conversation_id);
-      if (conv) {
-        await openConversation(conv.id);
-      }
+      if (conv) await openConversation(conv.id);
     }
     if (session?.document_filter) {
       selectedDocFilter = session.document_filter;
@@ -52,17 +68,15 @@ async function initApp() {
     document.getElementById('sidebar-upload-queue'),
   );
 
-  // Setup auto-refresh every 30s for doc statuses
-  setInterval(() => {
-    loadDocuments();
-    loadStats();
-  }, 30000);
+  // Auto-refresh every 30s
+  setInterval(() => { loadDocuments(); loadStats(); }, 30000);
 
   hideLoader();
 }
 
 function hideLoader() {
   const overlay = document.getElementById('loading-overlay');
+  if (!overlay) return;
   overlay.style.opacity = '0';
   setTimeout(() => overlay.remove(), 400);
 }
@@ -83,7 +97,7 @@ function showBackendError() {
   `;
 }
 
-// ─── Sidebar Tab Switching ────────────────────────────────────
+// ─── Sidebar Tab Switching ────────────────────────────────────────────────────
 
 function switchSidebarTab(tab) {
   const tabs = ['chats', 'docs', 'upload'];
@@ -93,10 +107,10 @@ function switchSidebarTab(tab) {
   });
 }
 
-// ─── Session Persistence ──────────────────────────────────────
+// ─── Session Persistence ──────────────────────────────────────────────────────
 
 function saveSessionState() {
-  if (!sessionId) return;
+  if (!sessionId || !auth.isLoggedIn()) return;
   api.saveSession(sessionId, {
     session_id: sessionId,
     active_conversation_id: currentConvId,
@@ -104,10 +118,9 @@ function saveSessionState() {
   }).catch(() => {});
 }
 
-// Save session when tab closes
 window.addEventListener('beforeunload', saveSessionState);
 
-// ─── Toast Notifications ──────────────────────────────────────
+// ─── Toast Notifications ──────────────────────────────────────────────────────
 
 function showToast(message, type = 'info') {
   const container = document.getElementById('toast-container');
@@ -130,6 +143,6 @@ function showToast(message, type = 'info') {
   }, duration);
 }
 
-// ─── Boot ────────────────────────────────────────────────────
+// ─── Boot ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', initApp);

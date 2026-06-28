@@ -1,52 +1,46 @@
 """
-Enterprise AI Knowledge Assistant — FastAPI Main Application
+FastAPI main entry point
 """
-import os
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
 
 from database.db import init_db
 from services import bm25_store
-from api.documents import router as docs_router
+from api.auth import router as auth_router
 from api.chat import router as chat_router
+from api.documents import router as documents_router
+from api.evaluate import router as evaluate_router
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup & shutdown lifecycle."""
-    logger.info("🚀 Starting Enterprise RAG Backend...")
-
-    # Init database
+    """Startup/shutdown tasks."""
+    logger.info("Starting Enterprise RAG Backend...")
     await init_db()
-    logger.info("✅ Database initialized")
-
-    # Load BM25 index from disk
     bm25_store.load_index()
-    logger.info("✅ BM25 index loaded")
-
-    logger.info("✅ Backend ready at http://localhost:8000")
+    logger.info("Backend ready!")
     yield
-
-    logger.info("👋 Shutting down...")
+    logger.info("Backend shutting down.")
 
 
 app = FastAPI(
     title="Enterprise AI Knowledge Assistant",
-    description="Advanced RAG with Hybrid Search, LangGraph Streaming, and Citations",
+    description="Advanced RAG platform with hybrid search, JWT auth, and local LLM",
     version="1.0.0",
     lifespan=lifespan,
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -55,20 +49,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routes
-app.include_router(docs_router)
+# ── API Routers ──────────────────────────────────────────────────────────────
+app.include_router(auth_router)
 app.include_router(chat_router)
+app.include_router(documents_router)
+app.include_router(evaluate_router)
 
-# Health check
+
+# ── Health ────────────────────────────────────────────────────────────────────
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "service": "Enterprise RAG Backend"}
+    return {"status": "ok", "service": "Enterprise RAG Backend", "version": "1.0.0"}
 
-# Serve frontend static files
-frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
-if os.path.exists(frontend_path):
-    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
+
+# ── Serve Frontend ────────────────────────────────────────────────────────────
+frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+if os.path.exists(frontend_dir):
+    app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
+
+    @app.get("/")
+    async def serve_frontend():
+        return FileResponse(os.path.join(frontend_dir, "index.html"))
+
+    @app.get("/{full_path:path}")
+    async def catch_all(full_path: str):
+        file_path = os.path.join(frontend_dir, full_path)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(frontend_dir, "index.html"))
+
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)

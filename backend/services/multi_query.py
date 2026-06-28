@@ -59,6 +59,7 @@ async def multi_query_search(
     query: str,
     k: int = None,
     doc_filter: Optional[List[str]] = None,
+    user_id: Optional[str] = None,
 ) -> List[Dict]:
     """
     1. Generate N alternative queries
@@ -77,7 +78,7 @@ async def multi_query_search(
     merged = []
 
     for q in all_queries:
-        hits = await hybrid_search(q, k=k, doc_filter=doc_filter)
+        hits = await hybrid_search(q, k=k, doc_filter=doc_filter, user_id=user_id)
         for hit in hits:
             cid = hit["chunk_id"]
             if cid not in seen_ids:

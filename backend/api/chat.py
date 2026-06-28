@@ -1,7 +1,7 @@
 """
-Chat API
+Chat API (user-scoped)
 POST /api/chat/stream        - Streaming chat (SSE)
-GET  /api/conversations      - List all conversations
+GET  /api/conversations      - List user's conversations
 POST /api/conversations      - Create a new conversation
 GET  /api/conversations/{id}/messages - Get messages
 DELETE /api/conversations/{id}        - Delete conversation
@@ -19,10 +19,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from pydantic import BaseModel
 
-from database.db import get_db, Conversation, Message
+from database.db import get_db, Conversation, Message, User
 from models.schemas import ConversationResponse, MessageResponse, ChatRequest, Citation
 from services.rag_chain import run_rag_stream
 from services.conversation import load_session, save_session, list_sessions
+from services.auth import get_current_user
 
 router = APIRouter(tags=["chat"])
 logger = logging.getLogger(__name__)
@@ -31,12 +32,16 @@ logger = logging.getLogger(__name__)
 # ─── Session endpoints ────────────────────────────────────────────────────────
 
 @router.get("/api/sessions/{session_id}")
-async def get_session(session_id: str):
+async def get_session(session_id: str, current_user: User = Depends(get_current_user)):
     return load_session(session_id)
 
 
 @router.put("/api/sessions/{session_id}")
-async def update_session(session_id: str, data: dict):
+async def update_session(
+    session_id: str,
+    data: dict,
+    current_user: User = Depends(get_current_user),
+):
     existing = load_session(session_id)
     existing.update(data)
     save_session(session_id, existing)
@@ -44,16 +49,21 @@ async def update_session(session_id: str, data: dict):
 
 
 @router.get("/api/sessions")
-async def get_all_sessions():
+async def get_all_sessions(current_user: User = Depends(get_current_user)):
     return list_sessions()
 
 
 # ─── Conversation endpoints ───────────────────────────────────────────────────
 
 @router.get("/api/conversations", response_model=List[ConversationResponse])
-async def list_conversations(db: AsyncSession = Depends(get_db)):
+async def list_conversations(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     result = await db.execute(
-        select(Conversation).order_by(Conversation.updated_at.desc())
+        select(Conversation)
+        .where(Conversation.user_id == current_user.id)
+        .order_by(Conversation.updated_at.desc())
     )
     return result.scalars().all()
 
@@ -65,9 +75,14 @@ class CreateConversationRequest(BaseModel):
 @router.post("/api/conversations", response_model=ConversationResponse)
 async def create_conversation(
     req: CreateConversationRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    conv = Conversation(id=str(uuid.uuid4()), title=req.title)
+    conv = Conversation(
+        id=str(uuid.uuid4()),
+        user_id=current_user.id,
+        title=req.title,
+    )
     db.add(conv)
     await db.commit()
     await db.refresh(conv)
@@ -75,7 +90,18 @@ async def create_conversation(
 
 
 @router.get("/api/conversations/{conv_id}/messages", response_model=List[MessageResponse])
-async def get_messages(conv_id: str, db: AsyncSession = Depends(get_db)):
+async def get_messages(
+    conv_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Verify ownership
+    conv_result = await db.execute(
+        select(Conversation).where(Conversation.id == conv_id, Conversation.user_id == current_user.id)
+    )
+    if not conv_result.scalar_one_or_none():
+        raise HTTPException(404, "Conversation not found")
+
     result = await db.execute(
         select(Message)
         .where(Message.conversation_id == conv_id)
@@ -102,7 +128,17 @@ async def get_messages(conv_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.delete("/api/conversations/{conv_id}")
-async def delete_conversation(conv_id: str, db: AsyncSession = Depends(get_db)):
+async def delete_conversation(
+    conv_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    conv_result = await db.execute(
+        select(Conversation).where(Conversation.id == conv_id, Conversation.user_id == current_user.id)
+    )
+    if not conv_result.scalar_one_or_none():
+        raise HTTPException(404, "Conversation not found")
+
     await db.execute(delete(Message).where(Message.conversation_id == conv_id))
     await db.execute(delete(Conversation).where(Conversation.id == conv_id))
     await db.commit()
@@ -112,24 +148,29 @@ async def delete_conversation(conv_id: str, db: AsyncSession = Depends(get_db)):
 # ─── Streaming Chat endpoint ──────────────────────────────────────────────────
 
 @router.post("/api/chat/stream")
-async def chat_stream(req: ChatRequest, db: AsyncSession = Depends(get_db)):
-    """
-    Streaming SSE endpoint.
-    Events:
-    - data: {"type": "status", "message": "..."}
-    - data: {"type": "citation", "data": [...]}
-    - data: {"type": "token", "content": "..."}
-    - data: {"type": "done", "answer": "...", "citations": [...]}
-    - data: {"type": "error", "message": "..."}
-    """
-    # Load conversation history
+async def chat_stream(
+    req: ChatRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Verify conversation ownership
+    conv_result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == req.conversation_id,
+            Conversation.user_id == current_user.id,
+        )
+    )
+    conv = conv_result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(404, "Conversation not found")
+
+    # Load history
     result = await db.execute(
         select(Message)
         .where(Message.conversation_id == req.conversation_id)
         .order_by(Message.created_at.asc())
     )
-    history_rows = result.scalars().all()
-    history = [{"role": m.role, "content": m.content} for m in history_rows]
+    history = [{"role": m.role, "content": m.content} for m in result.scalars().all()]
 
     # Save user message
     user_msg = Message(
@@ -140,16 +181,14 @@ async def chat_stream(req: ChatRequest, db: AsyncSession = Depends(get_db)):
     )
     db.add(user_msg)
 
-    # Update conversation title if first message
-    conv_result = await db.execute(
-        select(Conversation).where(Conversation.id == req.conversation_id)
-    )
-    conv = conv_result.scalar_one_or_none()
-    if conv and conv.title == "New Conversation":
+    if conv.title == "New Conversation":
         conv.title = req.message[:60] + ("..." if len(req.message) > 60 else "")
         conv.updated_at = datetime.utcnow()
 
     await db.commit()
+
+    # Pass user_id as doc_filter context so RAG only retrieves user's chunks
+    user_doc_filter = req.document_filter or None
 
     async def event_stream():
         full_answer = ""
@@ -158,7 +197,8 @@ async def chat_stream(req: ChatRequest, db: AsyncSession = Depends(get_db)):
         async for event in run_rag_stream(
             query=req.message,
             conversation_history=history,
-            doc_filter=req.document_filter or None,
+            doc_filter=user_doc_filter,
+            user_id=current_user.id,
         ):
             if event["type"] == "token":
                 full_answer += event["content"]
@@ -169,7 +209,6 @@ async def chat_stream(req: ChatRequest, db: AsyncSession = Depends(get_db)):
 
             yield f"data: {json.dumps(event)}\n\n"
 
-        # Save assistant message to DB
         from database.db import AsyncSessionLocal
         async with AsyncSessionLocal() as save_db:
             asst_msg = Message(
@@ -180,8 +219,6 @@ async def chat_stream(req: ChatRequest, db: AsyncSession = Depends(get_db)):
                 citations=json.dumps(final_citations) if final_citations else None,
             )
             save_db.add(asst_msg)
-
-            # Update conversation timestamp
             conv_res = await save_db.execute(
                 select(Conversation).where(Conversation.id == req.conversation_id)
             )
@@ -199,5 +236,5 @@ async def chat_stream(req: ChatRequest, db: AsyncSession = Depends(get_db)):
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
             "Access-Control-Allow-Origin": "*",
-        }
+        },
     )

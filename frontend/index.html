@@ -16,6 +16,55 @@
   <p style="color:var(--text-muted);font-size:0.82rem;">Initializing Knowledge Assistant...</p>
 </div>
 
+<!-- Auth Overlay (Login / Register) -->
+<div id="auth-overlay">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-logo">🧠</div>
+      <h1>KnowledgeAI</h1>
+      <p>Enterprise RAG Platform</p>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab-btn active" data-tab="login">Sign In</button>
+      <button class="auth-tab-btn" data-tab="register">Register</button>
+    </div>
+    <!-- Login Form -->
+    <div class="auth-form-panel active" data-form="login">
+      <form id="login-form">
+        <div class="auth-field">
+          <label for="login-username">Username</label>
+          <input type="text" id="login-username" placeholder="Enter your username" autocomplete="username" required />
+        </div>
+        <div class="auth-field">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" placeholder="Enter your password" autocomplete="current-password" required />
+        </div>
+        <p class="auth-error" id="login-error"></p>
+        <button type="submit" id="login-btn" class="btn btn-primary auth-submit-btn">Sign In</button>
+      </form>
+    </div>
+    <!-- Register Form -->
+    <div class="auth-form-panel" data-form="register">
+      <form id="register-form">
+        <div class="auth-field">
+          <label for="register-username">Username</label>
+          <input type="text" id="register-username" placeholder="Choose a username (3-30 chars)" autocomplete="username" required />
+        </div>
+        <div class="auth-field">
+          <label for="register-password">Password</label>
+          <input type="password" id="register-password" placeholder="Min 6 characters" autocomplete="new-password" required />
+        </div>
+        <div class="auth-field">
+          <label for="register-password2">Confirm Password</label>
+          <input type="password" id="register-password2" placeholder="Repeat your password" autocomplete="new-password" required />
+        </div>
+        <p class="auth-error" id="register-error"></p>
+        <button type="submit" id="register-btn" class="btn btn-primary auth-submit-btn">Create Account</button>
+      </form>
+    </div>
+  </div>
+</div>
+
 <!-- App Shell -->
 <div id="app">
 
@@ -121,6 +170,11 @@
         <button class="btn btn-ghost" onclick="switchSidebarTab('upload')">
           ⬆️ Upload
         </button>
+        <div class="user-badge" id="user-badge" style="display:none">
+          <span class="user-icon">👤</span>
+          <span id="user-badge-name"></span>
+          <button class="logout-btn" onclick="auth.logout()" title="Logout">↩</button>
+        </div>
       </div>
     </div>
 
@@ -184,7 +238,8 @@
 <!-- Toast Container -->
 <div id="toast-container"></div>
 
-<!-- Scripts -->
+<!-- Scripts (auth first — others depend on auth.getToken()) -->
+<script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/upload.js"></script>
 <script src="/js/documents.js"></script>
