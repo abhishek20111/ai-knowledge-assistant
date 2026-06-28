@@ -51,8 +51,11 @@ def rerank(query: str, chunks: List[Dict], top_k: int = None) -> List[Dict]:
         for r in results[:top_k]:
             idx = r["id"]
             chunk = dict(chunks[idx])
-            chunk["rerank_score"] = r["score"]
-            chunk["score"] = r["score"]
+            # Cast to Python float — FlashRank returns numpy float32
+            # which is NOT JSON serializable
+            score = float(r["score"])
+            chunk["rerank_score"] = score
+            chunk["score"] = score
             reranked.append(chunk)
         return reranked
     except Exception as e:
