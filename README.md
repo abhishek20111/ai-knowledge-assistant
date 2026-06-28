@@ -1,5 +1,9 @@
 # 🧠 Enterprise AI Knowledge Assistant
 
+```
+![alt text](image.png)
+```
+
 > **Talk to your company documents using AI** — Upload PDFs, Word files, Excel sheets, and images. Ask anything in plain English and get accurate answers with source citations, powered by a fully local AI stack.
 
 <div align="center">
@@ -120,6 +124,33 @@
 │       ↓                                                        │
 │  Browser renders answer + citation cards in real-time          │
 └────────────────────────────────────────────────────────────────┘
+```
+##  System works end-to-end:
+```
+UPLOAD FLOW
+═══════════
+File → Document Processor → Parent-Child Chunker → Embedder → ChromaDB + BM25
+
+QUERY FLOW  
+══════════
+Your Question
+     ↓
+[LangGraph Node 1] RETRIEVE
+   → Multi-Query: LLM makes 3 variations of your question
+   → Dense Search: ChromaDB finds semantically similar chunks
+   → Sparse Search: BM25 finds keyword-matching chunks
+   → RRF Fusion: merges and deduplicates both result lists
+     ↓
+[LangGraph Node 2] EXPAND PARENTS
+   → Small child chunks → look up their bigger parent for more context
+     ↓
+[LangGraph Node 3] RERANK
+   → FlashRank scores all 20 results → keeps top 5
+     ↓
+[LangGraph Node 4] BUILD PROMPT
+   → Injects: context + citations + last 5 conversation turns
+     ↓
+Ollama qwen2.5:7b → Streams tokens via SSE → Browser renders live
 ```
 
 ---
